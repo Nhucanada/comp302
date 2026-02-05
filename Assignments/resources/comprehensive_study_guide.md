@@ -411,6 +411,12 @@ CPS is a technique to make ANY function tail-recursive by:
 2. Instead of returning values, call the continuation with the result
 3. Move post-recursive work into expanded continuations
 
+### Common Exam CPS Questions
+- **Tree flattening** (very frequent)
+- **Tree operations** with nested recursive calls
+- **Type signature transformations**
+- **Initial continuation** is always identity `(fun x -> x)`
+
 ### The CPS Translation Recipe
 
 ```
@@ -482,6 +488,27 @@ The continuation represents the **call stack** as a function:
 - Original: Uses O(n) **stack** memory (limited, ~8MB)
 - CPS: Uses O(n) **heap** memory (dynamic, can be GBs)
 
+### Tree Flattening (Most Common Exam Question!)
+
+```ocaml
+type 'a tree = Leaf of 'a | Node of 'a tree * 'a tree
+
+(* Original - not tail recursive *)
+let rec flatten t = match t with
+  | Leaf x -> [x]
+  | Node(l,r) -> flatten l @ flatten r
+
+(* CPS version - exam solution pattern *)
+let rec flatten_cps t cont = match t with
+  | Leaf x -> cont [x]
+  | Node(l,r) ->
+      flatten_cps l (fun left_result ->
+        flatten_cps r (fun right_result ->
+          cont (left_result @ right_result)))
+
+(* Usage: flatten_cps tree (fun x -> x) *)
+```
+
 ### Early Exit with CPS
 
 CPS allows "jumping" out of nested computations:
@@ -496,6 +523,59 @@ let product l return_outside =
         else go xs (fun y -> return (y * x))
   in
   go l return_outside
+```
+
+---
+
+## Exam-Specific Patterns & Traps
+
+### Type Inference Step-by-Step
+1. **Assign variables**: Each parameter gets `'a`, `'b`, etc.
+2. **Gather constraints**: `x + 1` → `x:int`, `f x` → `f:'a -> 'b`
+3. **Unify**: Solve constraints to find most general type
+4. **Common traps**:
+   - Function application: `app (app double)` requires careful type tracing
+   - Polymorphic vs concrete: Don't assume `int` when `'a` works
+
+### Pattern Matching Bug Hunting
+**Classic bugs from exams:**
+```ocaml
+let func f lst1 lst2 = (* Missing 'rec'! *)
+  match (lst1, lst2) with
+  | (x::xs, Some y) -> (* WRONG: Some y expects option, not list element *)
+  | _ -> ["Error"]     (* WRONG: String list, not polymorphic *)
+```
+
+### Scoping & Evaluation Tracing
+**Key principle**: Inner bindings shadow outer ones
+```ocaml
+let x = 6 in (let x = 9 in x) * x
+(* Step 1: Evaluate inner (let x = 9 in x) → 9 *)
+(* Step 2: Outer x is still 6 → 9 * 6 = 54 *)
+```
+
+### Higher-Order Function Composition
+**Exam pattern**: Combine filter/map efficiently
+```ocaml
+(* Inefficient: map f (filter p l) *)
+(* Efficient: filter_map (trans_pred f p) l *)
+
+let trans_pred f p x = if p x then Some (f x) else None
+let rec filter_map tp l = match l with
+  | [] -> []
+  | x::xs -> match tp x with Some y -> y::filter_map tp xs | None -> filter_map tp xs
+```
+
+### Physics/Real-World Modeling
+**Exam loves**: Variant types with realistic scenarios
+```ocaml
+type object = Static of pos | Dynamic of pos * vel * acc
+
+(* Pattern: Transform each object *)
+let simulate_all delta objs = map (simulate delta) objs
+
+(* Pattern: Check any condition *)
+let any_collides delta point objs = exists (collides delta point) objs
 ```
 
 ---
@@ -598,3 +678,27 @@ let rec f_cps input return =
 3. **Master pattern matching**: It's the core of OCaml programming
 4. **Accumulator intuition**: Think "what partial result am I building up?"
 5. **CPS intuition**: Think "what do I do with the result once I have it?"
+
+## Exam Success Strategies
+
+### For Type Questions
+- Always start with most general type (`'a`, `'b`)
+- Trace function applications step-by-step
+- Watch for polymorphism opportunities
+- Common answer: `('a -> 'b) -> 'a list -> 'b list` patterns
+
+### For Implementation Questions
+- **Tail recursion**: Use accumulator pattern (90% of cases)
+- **CPS**: Nested continuations for multiple recursive calls
+- **Pattern matching**: Exhaust all cases, use `_` carefully
+- **filter_map**: Very common, memorize the pattern
+
+### For Debugging Questions
+- Look for: missing `rec`, wrong constructors, type conflicts
+- Remember: Pattern variables bind, they don't check equality
+- Check: Are all cases handled? Are types consistent?
+
+### Time Management
+- **CPS questions**: Often worth most points, budget time accordingly
+- **Type inference**: Work systematically, don't guess
+- **Tail recursion**: Follow the accumulator recipe mechanically

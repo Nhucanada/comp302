@@ -1,6 +1,24 @@
 # COMP 302 Crib Sheet (One Page)
 
-## CPS Translation (Most Important!)
+## Common Exam Patterns
+
+**Tail Recursion Conversion** (Very frequent!): Always use accumulator pattern
+```ocaml
+(* Original *) let rec f x = if base then v else op (f smaller)
+(* TR version *)
+let f x = let rec go x acc = if base then acc else go smaller (update acc) in go x init
+```
+
+**Pattern Match Bugs**: Missing `rec`, wrong constructors (`Some y` vs `y::ys`), type mismatches, unreachable patterns
+
+**Scoping/Evaluation**: Inner `let-in` shadows outer: `let x=6 in (let x=9 in x) * x` → `9 * 6 = 54`
+
+**Type Inference Traps**:
+- `f x x` means both params same type, not equality check
+- `x + 1` constrains `x:int`, `x *. y` constrains both `float`
+- Missing polymorphism: `'a -> 'a` not `int -> int`
+
+## CPS Translation (Critical!)
 
 **Recipe**: Add continuation `return`, call it instead of returning, nest recursive calls
 
@@ -39,6 +57,18 @@ f_cps left (fun l_result ->
 **Key**: No recursion! Use the numeral's built-in iteration.
 
 ---
+
+## HOF Exam Patterns
+
+**filter_map** (Common exam question!):
+```ocaml
+let rec filter_map tp l = match l with [] -> []
+  | x::xs -> match tp x with Some y -> y::filter_map tp xs | None -> filter_map tp xs
+```
+
+**trans_pred** pattern: `fun f p x -> if p x then Some (f x) else None`
+
+**Implementing via fold**: map and filter can both be written using fold_right
 
 ## Higher-Order Functions
 
@@ -103,6 +133,21 @@ type 'a tree = Empty | Node of 'a tree * 'a * 'a tree
 
 ---
 
+## Tricky Evaluation/Tracing
+
+**Call-by-value**: Arguments evaluated before function call
+**Shadowing**: `let x=6 in (let x=9 in x) * x` → inner `x=9`, outer `x=6` → `54`
+**Function application**: `f a b c` = `((f a) b) c` (left-associative)
+**Type arrows**: `a -> b -> c` = `a -> (b -> c)` (right-associative)
+
+## Pattern Match Pitfalls
+
+- **Missing `rec`**: Recursive functions MUST have `rec` keyword
+- **Constructor confusion**: `Some y` expects option, `y::ys` expects list
+- **Type mismatch**: `["Error"]` is `string list`, not `'a list`
+- **Variable binding**: Pattern variables create NEW names, don't check equality
+- **Guards**: Use `when` for conditions: `| (a,b) when a=b -> ...`
+
 ## Key Operators
 
 | Int | Float | String | List |
@@ -113,9 +158,16 @@ type 'a tree = Empty | Node of 'a tree * 'a * 'a tree
 
 ---
 
-## CPS Examples
+## CPS Examples (Exam Favorites!)
 
 ```ocaml
+(* Tree flatten - very common exam question *)
+let rec flatten_cps t cont = match t with
+  | Leaf x -> cont [x]
+  | Node(l,r) -> flatten_cps l (fun left_result ->
+                   flatten_cps r (fun right_result ->
+                     cont (left_result @ right_result)))
+
 (* Tree depth with maxk *)
 let rec depth_cps t k = match t with
   | Empty -> k 0
@@ -123,20 +175,18 @@ let rec depth_cps t k = match t with
                      depth_cps r (fun dr ->
                        maxk dl dr (fun m -> k (1+m))))
 
-(* Preorder traversal *)
-let rec traverse_cps t k = match t with
-  | Empty -> k []
-  | Node(l,x,r) -> traverse_cps l (fun ll ->
-                     traverse_cps r (fun rl ->
-                       k (x :: ll @ rl)))
+(* Start with identity: flatten_cps tree (fun x -> x) *)
 ```
 
 ---
 
-## Quick Formulas
+## Quick Formulas & Exam Tricks
 
 - **Tail-rec fib**: `fib n a b` where `a=F(i)`, `b=F(i+1)`, init `(n,0,1)`
 - **Church add**: First apply n2, then n1 more: `n1 s (n2 s z)`
 - **Church mult**: Compose applications: `n1 (n2 s) z`
 - **CPS type**: Add `(original_return -> 'r) -> 'r` to signature
 - **fold_right**: `f` takes element + recursive result, `e` is base case
+- **Partial application**: `app (app double)` → `int -> int` (trace through types!)
+- **Collision detection**: `(x-start) * (x-end) < 0` (sign change = collision)
+- **Option list processing**: `'a option list -> 'b list` pattern (extract Some, skip None)
